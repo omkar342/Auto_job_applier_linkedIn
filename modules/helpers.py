@@ -25,8 +25,50 @@ import pathlib
 from time import sleep
 from random import randint
 from datetime import datetime, timedelta
-from pyautogui import alert
-from pprint import pprint
+try:
+    import pyautogui
+    _has_pyautogui = True
+except Exception:
+    pyautogui = None
+    _has_pyautogui = False
+
+def alert(text='', title='', button='OK'):
+    if os.environ.get("RUN_CRON") == "1" or not sys.stdin.isatty():
+        print(f"\n[{title}] {text}")
+        return button
+    if _has_pyautogui:
+        try:
+            return pyautogui.alert(text, title, button)
+        except Exception:
+            pass
+    print(f"\n[{title}] {text}")
+    try:
+        input(f"Press Enter to {button}...")
+    except (EOFError, IOError):
+        pass
+    return button
+
+def confirm(text='', title='', buttons=['OK', 'Cancel']):
+    if os.environ.get("RUN_CRON") == "1" or not sys.stdin.isatty():
+        print(f"\n[{title}] {text}")
+        return buttons[0]
+    if _has_pyautogui:
+        try:
+            return pyautogui.confirm(text, title, buttons)
+        except Exception:
+            pass
+    print(f"\n[{title}] {text}")
+    print(f"Options: {', '.join(buttons)}")
+    while True:
+        try:
+            res = input(f"Enter choice ({'/'.join(buttons)}): ").strip()
+        except (EOFError, IOError):
+            return buttons[0]
+        if not res: return buttons[0]
+        for b in buttons:
+            if res.lower() == b.lower():
+                return b
+        print("Invalid choice.")
 
 from config.settings import logs_folder_path
 
@@ -172,7 +214,6 @@ def manual_login_retry(is_logged_in: callable, limit: int = 2) -> None:
     '''
     count = 0
     while not is_logged_in():
-        from pyautogui import alert
         print_lg("Seems like you're not logged in!")
         button = "Confirm Login"
         message = 'After you successfully Log In, please click "{}" button below.'.format(button)

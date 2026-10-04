@@ -41,8 +41,38 @@ run_non_stop = False                # True or False, Note: True or False are cas
 Note: Will be treated as False if `run_in_background = True`
 '''
 alternate_sortby = True             # True or False, Note: True or False are case-sensitive
-cycle_date_posted = True            # True or False, Note: True or False are case-sensitive
+cycle_date_posted = False            # True or False, Note: True or False are case-sensitive
 stop_date_cycle_at_24hr = True      # True or False, Note: True or False are case-sensitive
+
+# Skip jobs that were posted more than 24 hours ago? (Set to False to apply to older jobs like past week/month)
+strict_24hr_check = False           # True or False, Note: True or False are case-sensitive
+
+# Stop the program after reaching a certain number of successful applications (Easy Applied + External)
+total_applications_limit = 10 # 0 for no limit, or any positive integer Eg: 10, 50, 100...
+
+
+# >>>>>>>>>>> Scheduling Settings <<<<<<<<<<<
+
+# Run the bot periodically?
+run_scheduler = True               # True or False
+# Interval between runs in hours
+scheduler_interval_hours = 2.0      # Any positive number (e.g., 2, 0.5, 1.5)
+
+
+# >>>>>>>>>>> Phone Notifications Settings <<<<<<<<<<<
+# Get instant push notifications on your phone when the bot starts, completes, or encounters an error!
+enable_phone_notifications = True      # True or False
+
+# 1. ntfy.sh (Recommended - 100% Free, Instant, No sign-up required!)
+# Install the free 'ntfy' app from Google Play or App Store, tap '+', subscribe to this topic name:
+ntfy_topic = "omkar_linkedin_bot_alerts"
+
+# 2. Telegram Bot (Optional - if you prefer Telegram messages)
+telegram_bot_token = ""                # From @BotFather
+telegram_chat_id = ""                  # Your Telegram user ID
+
+# 3. Discord Webhook (Optional - if you prefer Discord)
+discord_webhook_url = ""
 
 
 

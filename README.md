@@ -8,18 +8,35 @@ Click on above image to watch the demo or use this link https://youtu.be/gMbB1fW
 
 
 ## ✨ Content
-- [Introduction](#linkedin-ai-auto-job-applier-)
-- [Demo Video](#%EF%B8%8F-see-it-in-action)
-- [Index](#-content)
-- [Install](#%EF%B8%8F-how-to-install)
-- [Configure](#-how-to-configure)
-- [Contributor Guidelines](#‍-contributor-guidelines)
-- [Updates](%EF%B8%8F-major-updates-history)
-- [Disclaimer](#-disclaimer)
-- [Terms and Conditions](#%EF%B8%8F-terms-and-conditions)
-- [License](#%EF%B8%8F-license)
-- [Socials](#-socials)
-- [Support and Discussions](#-community-support-and-discussions)
+- [LinkedIn AI Auto Job Applier 🤖](#linkedin-ai-auto-job-applier-)
+  - [📽️ See it in Action](#️-see-it-in-action)
+  - [✨ Content](#-content)
+  - [⚙️ How to install](#️-how-to-install)
+  - [🔧 How to configure](#-how-to-configure)
+  - [🧑‍💻 Contributor Guidelines](#-contributor-guidelines)
+    - [Code Guidelines](#code-guidelines)
+      - [Functions:](#functions)
+      - [Variables](#variables)
+      - [Configuration variables](#configuration-variables)
+    - [Attestation](#attestation)
+  - [🗓️ Major Updates History:](#️-major-updates-history)
+    - [Jan 20, 2026](#jan-20-2026)
+    - [Jul 20, 2024](#jul-20-2024)
+    - [Nov 28, 2024](#nov-28-2024)
+    - [Oct 16, 2024](#oct-16-2024)
+    - [Sep 09, 2024](#sep-09-2024)
+    - [Sep 07, 2024](#sep-07-2024)
+    - [Aug 21, 2024](#aug-21-2024)
+    - [June 19, 2024](#june-19-2024)
+    - [May 15, 2024](#may-15-2024)
+    - [May 05, 2024](#may-05-2024)
+    - [May 04, 2024](#may-04-2024)
+  - [📜 Disclaimer](#-disclaimer)
+  - [🏛️ Terms and Conditions](#️-terms-and-conditions)
+  - [⚖️ License](#️-license)
+  - [🐧 Socials](#-socials)
+  - [🙌 Community Support and Discussions](#-community-support-and-discussions)
+      - [ℹ️ Version: 26.01.20.5.08](#ℹ️-version-260120508)
 
 <br>
 
@@ -54,8 +71,12 @@ Click on above image to watch the tutorial for installation and configuration or
 5. Open `settings.py` file in `/config` folder to configure the bot settings like, keep screen awake, click intervals (click intervals are randomized to seem like human behavior), run in background, stealth mode (to avoid bot detection), etc. as per your needs.
 6. (Optional) Don't forget to add you default resume in the location you mentioned in `default_resume_path = "all resumes/default/resume.pdf"` given in `/config/questions.py`. If one is not provided, it will use your previous resume submitted in LinkedIn or (In Development) generate custom resume if OpenAI APT key is provided!
 7. Run `runAiBot.py` and see the magic happen.
-8. To run the Applied Jobs history UI, run `app.py` and open web browser on `http://localhost:5000`.
-8. If you have questions or need help setting it up or to talk in general, join the github server: https://discord.gg/fFp7uUzWCY
+8. **(New) Scheduling Runs:** To run the bot periodically (e.g., every 2 hours):
+   - Open `config/settings.py` and set `run_scheduler = True`.
+   - Adjust `scheduler_interval_hours` if needed.
+   - Run `python cron_scheduler.py` instead of `runAiBot.py`.
+9. To run the Applied Jobs history UI, run `app.py` and open web browser on `http://localhost:5000`.
+10. If you have questions or need help setting it up or to talk in general, join the github server: https://discord.gg/fFp7uUzWCY
 
 [back to index](#-content)
 

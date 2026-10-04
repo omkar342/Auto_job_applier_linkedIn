@@ -1,10 +1,9 @@
 ##> ------ Yang Li : MARKYangL - Feature ------
 from config.secrets import *
 from config.settings import showAiErrorAlerts
-from modules.helpers import print_lg, critical_error_log, convert_to_json
+from modules.helpers import print_lg, critical_error_log, convert_to_json, confirm
 from modules.ai.prompts import *
 
-from pyautogui import confirm
 from openai import OpenAI
 from openai.types.model import Model
 from openai.types.chat import ChatCompletion, ChatCompletionChunk

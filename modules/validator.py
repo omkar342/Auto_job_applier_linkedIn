@@ -47,13 +47,13 @@ def check_list(var: list, var_name: str, options: list=[], min_length: int=0) ->
 
 
 
-from config.personals import *
+from config.questions import *
 def validate_personals() -> None | ValueError | TypeError:
     '''
-    Validates all variables in the `/config/personals.py` file.
+    Validates all personal variables in the `/config/questions.py` file.
     '''
     global __validation_file_path
-    __validation_file_path = "config/personals.py"
+    __validation_file_path = "config/questions.py"
 
     check_string(first_name, "first_name", min_length=1)
     check_string(middle_name, "middle_name")
@@ -199,6 +199,9 @@ def validate_settings() -> None | ValueError | TypeError:
     check_boolean(alternate_sortby, "alternate_sortby")
     check_boolean(cycle_date_posted, "cycle_date_posted")
     check_boolean(stop_date_cycle_at_24hr, "stop_date_cycle_at_24hr")
+    check_boolean(strict_24hr_check, "strict_24hr_check")
+    
+    check_int(total_applications_limit, "total_applications_limit", 0)
     
     # check_string(generated_resume_path, "generated_resume_path", min_length=1)
 

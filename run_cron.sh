@@ -8,9 +8,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
 # Environment settings for cron execution (GUI + Headless support)
+export PATH="/home/omkar/anaconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 export DISPLAY="${DISPLAY:-:0}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+
+# Automatically find GNOME / Mutter / Wayland Xauthority if not already set
+if [ -z "$XAUTHORITY" ]; then
+    AUTH_FILE=$(ls -t "$XDG_RUNTIME_DIR"/.*auth* 2>/dev/null | head -n 1)
+    if [ -n "$AUTH_FILE" ]; then
+        export XAUTHORITY="$AUTH_FILE"
+    elif [ -f "$HOME/.Xauthority" ]; then
+        export XAUTHORITY="$HOME/.Xauthority"
+    fi
+fi
+
 export RUN_CRON=1
 export PYTHONUNBUFFERED=1
 

@@ -938,7 +938,11 @@ def apply_to_jobs(search_terms: list[str]) -> None:
 
                     print_lg("\n-@-\n")
 
-                    job_id,title,company,work_location,work_style,skip = get_job_main_details(job, blacklisted_companies, rejected_jobs)
+                    try:
+                        job_id,title,company,work_location,work_style,skip = get_job_main_details(job, blacklisted_companies, rejected_jobs)
+                    except Exception as e:
+                        print_lg("Could not extract details for this job card, skipping...", e)
+                        continue
                     
                     if skip: continue
                     # Redundant fail safe check for applied jobs!
@@ -1050,6 +1054,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                         ##<
 
                     uploaded = False
+                    modal = None
                     # Case 1: Easy Apply Button
                     if try_xp(driver, ".//button[contains(@class,'jobs-apply-button') and contains(@class, 'artdeco-button--3') and contains(@aria-label, 'Easy')]"):
                         try: 
@@ -1088,7 +1093,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                 raise sje
                             except NoSuchElementException: errored = "nose"
                             finally:
-                                if errored not in ("stuck", "skip"):
+                                if errored not in ("stuck", "skip") and modal:
                                     if questions_list: 
                                         print_lg("Answered the following questions...", questions_list)
                                         print("\n\n" + "\n".join(str(question) for question in questions_list) + "\n\n")
@@ -1145,9 +1150,16 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                     print_lg(f"\n>-> Didn't find Page {current_page+1}. Probably at the end page of results!\n")
                     break
 
-        except (NoSuchWindowException, WebDriverException) as e:
-            print_lg("Browser window closed or session is invalid. Ending application process.", e)
-            raise e # Re-raise to be caught by main
+        except NoSuchWindowException as e:
+            print_lg("Browser window closed. Ending application process.", e)
+            raise e
+        except WebDriverException as e:
+            try:
+                _ = driver.current_window_handle
+                print_lg(f"Encountered WebDriverException on page: {e}. Moving to next search term.")
+            except Exception:
+                print_lg("Browser window closed or session is invalid. Ending application process.", e)
+                raise e
         except Exception as e:
             print_lg("Failed to find Job listings!")
             critical_error_log("In Applier", e)

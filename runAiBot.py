@@ -59,6 +59,10 @@ if use_AI:
 from typing import Literal
 
 
+class SkipJobException(Exception):
+    '''Custom exception to immediately abort and skip a job if an input takes > 5s or encounters difficulty.'''
+    pass
+
 if _has_pyautogui:
     pyautogui.FAILSAFE = False
 # if use_resume_generator:    from resume_generator import is_logged_in_GPT, login_GPT, open_resume_chat, create_custom_resume
@@ -66,9 +70,12 @@ if _has_pyautogui:
 
 #< Global Variables and logics
 
+# Enforce zero human intervention unconditionally
+pause_at_failed_question = False
+pause_before_submit = False
+pause_after_filters = False
+
 if run_in_background == True:
-    pause_at_failed_question = False
-    pause_before_submit = False
     run_non_stop = False
 
 first_name = first_name.strip()
@@ -442,6 +449,12 @@ def answer_common_questions(label: str, answer: str) -> str:
     return answer
 
 
+def check_input_timeout(q_start: float, label_org: str = "Input") -> None:
+    elapsed = time.time() - q_start
+    if elapsed > 5.0:
+        raise SkipJobException(f"Input '{label_org}' took {elapsed:.1f}s (> 5 seconds) to fill. Skipping job.")
+
+
 # Function to answer the questions for Easy Apply
 def answer_questions(modal: WebElement, questions_list: set, work_location: str, job_description: str | None = None ) -> set:
     # Get all questions from the page
@@ -453,10 +466,17 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str,
     # all_questions = all_questions + all_list_questions + all_single_line_questions
 
     for Question in all_questions:
+        q_start = time.time()
+        label_org = "Unknown"
+        # Immediate check for existing LinkedIn inline validation error
+        inline_errs = Question.find_elements(By.XPATH, ".//div[contains(@class,'artdeco-inline-feedback--error')] | .//span[contains(@class,'artdeco-inline-feedback--error')]")
+        for ie in inline_errs:
+            if ie.text.strip():
+                raise SkipJobException(f"Validation error on input: '{ie.text.strip()}'. Skipping job.")
+
         # Check if it's a select Question
         select = try_xp(Question, ".//select", False)
         if select:
-            label_org = "Unknown"
             try:
                 label = Question.find_element(By.TAG_NAME, "label")
                 label_org = label.find_element(By.TAG_NAME, "span").text
@@ -528,6 +548,7 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str,
                         select.select_by_index(randint(1, len(select.options)-1))
                         answer = select.first_selected_option.text
                         randomly_answered_questions.add((f'{label_org} [ {options} ]',"select"))
+            check_input_timeout(q_start, label_org)
             questions_list.add((f'{label_org} [ {options} ]', answer, "select", prev_answer))
             continue
         
@@ -585,11 +606,12 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str,
                     actions.move_to_element(ele).click().perform()
                     if not foundOption: randomly_answered_questions.add((f'{label_org} ]',"radio"))
             else: answer = prev_answer
+            check_input_timeout(q_start, label_org)
             questions_list.add((label_org+" ]", answer, "radio", prev_answer))
             continue
         
         # Check if it's a text question
-        text = try_xp(Question, ".//input[@type='text']", False)
+        text = try_xp(Question, ".//input[not(@type) or @type='text' or @type='number' or @type='tel' or @type='email' or @type='search' or @role='combobox']", False)
         if text: 
             do_actions = False
             label = try_xp(Question, ".//label[@for]", False)
@@ -677,12 +699,14 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str,
                     sleep(2)
                     actions.send_keys(Keys.ARROW_DOWN)
                     actions.send_keys(Keys.ENTER).perform()
+            check_input_timeout(q_start, label_org)
             questions_list.add((label, text.get_attribute("value"), "text", prev_answer))
             continue
 
         # Check if it's a textarea question
         text_area = try_xp(Question, ".//textarea", False)
         if text_area:
+            do_actions = False
             label = try_xp(Question, ".//label[@for]", False)
             label_org = label.text if label else "Unknown"
             label = label_org.lower()
@@ -721,6 +745,7 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str,
                     sleep(2)
                     actions.send_keys(Keys.ARROW_DOWN)
                     actions.send_keys(Keys.ENTER).perform()
+            check_input_timeout(q_start, label_org)
             questions_list.add((label, text_area.get_attribute("value"), "textarea", prev_answer))
             ##<
             continue
@@ -742,8 +767,11 @@ def answer_questions(modal: WebElement, questions_list: set, work_location: str,
                 except Exception as e: 
                     print_lg("Checkbox click failed!", e)
                     pass
+            check_input_timeout(q_start, label_org)
             questions_list.add((f'{label} ([X] {answer})', checked, "checkbox", prev_answer))
             continue
+
+        check_input_timeout(q_start, label_org)
 
 
     # Select todays date
@@ -1035,16 +1063,10 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                 next_counter = 0
                                 while next_button:
                                     next_counter += 1
-                                    if next_counter >= 15: 
-                                        if pause_at_failed_question:
-                                            screenshot(driver, job_id, "Needed manual intervention for failed question")
-                                            alert("Couldn't answer one or more questions.\nPlease click \"Continue\" once done.\nDO NOT CLICK Back, Next or Review button in LinkedIn.\n\n\n\n\nYou can turn off \"Pause at failed question\" setting in config.py", "Help Needed", "Continue")
-                                            next_counter = 1
-                                            continue
+                                    if next_counter >= 3: 
                                         if questions_list: print_lg("Stuck for one or some of the following questions...", questions_list)
                                         screenshot_name = screenshot(driver, job_id, "Failed at questions")
-                                        errored = "stuck"
-                                        raise Exception("Seems like stuck in a continuous loop of next, probably because of new questions.")
+                                        raise SkipJobException("Form failed to advance after Next/Review clicks (stuck in loop). Skipping job.")
                                     questions_list = answer_questions(modal, questions_list, work_location, job_description=description)
                                     if useNewResume and not uploaded: uploaded, resume = upload_resume(modal, default_resume_path)
                                     try: next_button = modal.find_element(By.XPATH, './/span[normalize-space(.)="Review"]') 
@@ -1052,33 +1074,37 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                                     try: next_button.click()
                                     except ElementClickInterceptedException: break    # Happens when it tries to click Next button in About Company photos section
                                     buffer(click_gap)
+                                    # Check for validation errors after clicking Next
+                                    inline_errs = modal.find_elements(By.XPATH, ".//div[contains(@class,'artdeco-inline-feedback--error')] | .//span[contains(@class,'artdeco-inline-feedback--error')]")
+                                    for ie in inline_errs:
+                                        err_txt = ie.text.strip()
+                                        if err_txt:
+                                            raise SkipJobException(f"Validation error on form after Next: '{err_txt}'. Skipping job.")
 
+                            except SkipJobException as sje:
+                                errored = "skip"
+                                raise sje
                             except NoSuchElementException: errored = "nose"
                             finally:
-                                if questions_list and errored != "stuck": 
-                                    print_lg("Answered the following questions...", questions_list)
-                                    print("\n\n" + "\n".join(str(question) for question in questions_list) + "\n\n")
-                                wait_span_click(driver, "Review", 1, scrollTop=True)
-                                cur_pause_before_submit = pause_before_submit
-                                if errored != "stuck" and cur_pause_before_submit:
-                                    decision = confirm('1. Please verify your information.\n2. If you edited something, please return to this final screen.\n3. DO NOT CLICK "Submit Application".\n\n\n\n\nYou can turn off "Pause before submit" setting in config.py\nTo TEMPORARILY disable pausing, click "Disable Pause"', "Confirm your information",["Disable Pause", "Discard Application", "Submit Application"])
-                                    if decision == "Discard Application": raise Exception("Job application discarded by user!")
-                                    pause_before_submit = False if "Disable Pause" == decision else True
-                                    # try_xp(modal, ".//span[normalize-space(.)='Review']")
-                                follow_company(modal)
-                                if wait_span_click(driver, "Submit application", 2, scrollTop=True): 
-                                    date_applied = datetime.now()
-                                    if not wait_span_click(driver, "Done", 2): actions.send_keys(Keys.ESCAPE).perform()
-                                elif errored != "stuck" and cur_pause_before_submit and "Yes" in confirm("You submitted the application, didn't you 😒?", "Failed to find Submit Application!", ["Yes", "No"]):
-                                    date_applied = datetime.now()
-                                    wait_span_click(driver, "Done", 2)
-                                else:
-                                    print_lg("Since, Submit Application failed, discarding the job application...")
-                                    # if screenshot_name == "Not Available":  screenshot_name = screenshot(driver, job_id, "Failed to click Submit application")
-                                    # else:   screenshot_name = [screenshot_name, screenshot(driver, job_id, "Failed to click Submit application")]
-                                    if errored == "nose": raise Exception("Failed to click Submit application 😑")
+                                if errored not in ("stuck", "skip"):
+                                    if questions_list: 
+                                        print_lg("Answered the following questions...", questions_list)
+                                        print("\n\n" + "\n".join(str(question) for question in questions_list) + "\n\n")
+                                    wait_span_click(driver, "Review", 1, scrollTop=True)
+                                    follow_company(modal)
+                                    if wait_span_click(driver, "Submit application", 2, scrollTop=True): 
+                                        date_applied = datetime.now()
+                                        if not wait_span_click(driver, "Done", 2): actions.send_keys(Keys.ESCAPE).perform()
+                                    else:
+                                        print_lg("Since, Submit Application failed, discarding the job application...")
+                                        if errored == "nose": raise Exception("Failed to click Submit application 😑")
 
-
+                        except SkipJobException as sje:
+                            print_lg(f"Skipping job ({job_id}) due to input difficulty: {sje}")
+                            failed_job(job_id, job_link, resume, date_listed, "Skipped due to input difficulty (>5s or stuck)", sje, "Skipped", screenshot_name)
+                            skip_count += 1
+                            discard_job()
+                            continue
                         except Exception as e:
                             print_lg("Failed to Easy apply!")
                             # print_lg(e)

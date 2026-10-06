@@ -106,7 +106,7 @@ confidence_level = "8"
 pause_before_submit = False
 
 # Pause if the bot needs manual assistance with a failed/unmatched question
-pause_at_failed_question = True
+pause_at_failed_question = False
 
 # Overwrite previously saved answers on LinkedIn
 overwrite_previous_answers = False

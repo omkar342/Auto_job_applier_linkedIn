@@ -20,11 +20,11 @@ profile_name = "SIEM_SOAR"
 # ==============================================================================
 
 search_terms = [
+    "SOC Analyst",
     "SIEM Engineer",
     "SOAR Engineer",
     "Security Automation Engineer",
     "Cybersecurity Integration Engineer",
-    "SOC Analyst",
     "Detection Engineer",
     "Security Operations Engineer",
     "Microsoft Sentinel",
@@ -36,7 +36,7 @@ search_terms = [
 
 search_location = "India"
 switch_number = 10
-randomize_search_order = False
+randomize_search_order = True
 
 sort_by = ""
 date_posted = "Past week" # [Past 24 hours,Past 3 days,Past week,Past 2 weeks,Past month,Past 6 months]

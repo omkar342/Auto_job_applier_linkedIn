@@ -22,6 +22,15 @@ version:    24.12.3.10.30
 username = "omkarjadhav095@gmail.com"       # Enter your username in the quotes
 password = "linkedin@342002"           # Enter your password in the quotes
 
+# Email Notification Credentials (for non-Easy Apply job leads)
+email_sender = "omkarjadhav095@gmail.com"
+email_app_password = "wijbspufmqnotflh"
+email_recipient = "omkarjadhav095@gmail.com"
+
+# WhatsApp Notification Credentials (CallMeBot - add your apikey once CallMeBot replies)
+whatsapp_phone = "+918329733453"
+whatsapp_callmebot_apikey = ""
+
 
 ## Artificial Intelligence (Beta Not-Recommended)
 # Use AI

@@ -20,7 +20,7 @@ version:    26.01.20.5.08
 # >>>>>>>>>>> LinkedIn Settings <<<<<<<<<<<
 
 # Keep the External Application tabs open?
-close_tabs = False                  # True or False, Note: True or False are case-sensitive
+close_tabs = True                   # True or False, Note: True or False are case-sensitive
 '''
 Note: RECOMMENDED TO LEAVE IT AS `True`, if you set it `False`, be sure to CLOSE ALL TABS BEFORE CLOSING THE BROWSER!!!
 '''
@@ -73,6 +73,12 @@ telegram_chat_id = ""                  # Your Telegram user ID
 
 # 3. Discord Webhook (Optional - if you prefer Discord)
 discord_webhook_url = ""
+
+# 4. Email Notifications (Sends relevant non-Easy Apply job leads with title & direct link to your inbox)
+enable_email_job_notifications = True
+
+# 5. WhatsApp Notifications (Sends relevant non-Easy Apply job leads to your WhatsApp via CallMeBot)
+enable_whatsapp_job_notifications = False  # Set to True once you receive your CallMeBot API key
 
 
 

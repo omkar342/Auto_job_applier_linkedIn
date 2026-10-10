@@ -11,6 +11,10 @@ import sys
 import datetime
 import base64
 import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from urllib.parse import quote_plus
 
 # Try loading settings safely
 try:
@@ -19,7 +23,9 @@ try:
         ntfy_topic,
         telegram_bot_token,
         telegram_chat_id,
-        discord_webhook_url
+        discord_webhook_url,
+        enable_email_job_notifications,
+        enable_whatsapp_job_notifications
     )
 except ImportError:
     enable_phone_notifications = True
@@ -27,6 +33,23 @@ except ImportError:
     telegram_bot_token = ""
     telegram_chat_id = ""
     discord_webhook_url = ""
+    enable_email_job_notifications = True
+    enable_whatsapp_job_notifications = False
+
+try:
+    from config.secrets import (
+        email_sender,
+        email_app_password,
+        email_recipient,
+        whatsapp_phone,
+        whatsapp_callmebot_apikey
+    )
+except ImportError:
+    email_sender = "omkarjadhav095@gmail.com"
+    email_app_password = "wijbspufmqnotflh"
+    email_recipient = "omkarjadhav095@gmail.com"
+    whatsapp_phone = ""
+    whatsapp_callmebot_apikey = ""
 
 
 def _encode_rfc2047(text: str) -> str:
@@ -108,6 +131,174 @@ def send_discord(webhook_url: str, title: str, message: str, color: int = 344700
     except Exception as e:
         print(f"[Notifier] Failed to send Discord webhook: {e}")
         return False
+
+
+def send_email(subject: str, html_body: str, text_body: str = None) -> bool:
+    '''
+    Send HTML email notification via Gmail SMTP.
+    '''
+    sender = globals().get("email_sender", "")
+    pwd = globals().get("email_app_password", "")
+    recipient = globals().get("email_recipient", "") or sender
+
+    if not sender or not pwd or not recipient:
+        return False
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"LinkedIn AI Bot <{sender}>"
+        msg["To"] = recipient
+
+        if text_body:
+            msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.starttls()
+            server.login(sender, pwd)
+            server.sendmail(sender, recipient, msg.as_string())
+        print(f"[Notifier] Email notification sent to {recipient}!")
+        return True
+    except Exception as e:
+        print(f"[Notifier] Failed to send email: {e}")
+        return False
+
+
+def send_whatsapp(phone: str, apikey: str, message: str) -> bool:
+    '''
+    Send WhatsApp message via CallMeBot API.
+    '''
+    if not phone or not apikey:
+        return False
+
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={quote_plus(message)}&apikey={apikey}"
+    try:
+        res = requests.get(url, timeout=15)
+        if res.status_code == 200:
+            print(f"[Notifier] WhatsApp message sent to {phone}!")
+            return True
+        else:
+            print(f"[Notifier] CallMeBot returned status {res.status_code}: {res.text}")
+            return False
+    except Exception as e:
+        print(f"[Notifier] Failed to send WhatsApp message: {e}")
+        return False
+
+
+def notify_external_job(
+    title: str,
+    company: str,
+    work_location: str,
+    work_style: str,
+    job_link: str,
+    application_link: str,
+    experience_required: str = "Unknown",
+    skills: str = ""
+) -> None:
+    '''
+    Send rich notification (Email + WhatsApp + ntfy/phone) when a relevant non-Easy Apply job is found.
+    '''
+    now_str = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
+    clean_app_link = application_link if application_link and application_link != "Easy Applied" else job_link
+    skills_text = ", ".join(skills) if isinstance(skills, (list, set)) else str(skills or "Not specified")
+
+    # 1. Dispatch Email (if enabled)
+    if globals().get("enable_email_job_notifications", True):
+        subject = f"💼 [Job Lead] {title} at {company} ({work_location})"
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); border: 1px solid #e1e4e8;">
+    
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #0a66c2 0%, #004182 100%); padding: 24px 28px; color: #ffffff;">
+      <span style="background: rgba(255,255,255,0.22); color: #ffffff; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px;">External Apply Opportunity</span>
+      <h1 style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">{title}</h1>
+      <p style="margin: 0; font-size: 16px; opacity: 0.95; font-weight: 500;">🏢 {company}</p>
+    </div>
+
+    <!-- Body Info -->
+    <div style="padding: 24px 28px;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+        <tr style="border-bottom: 1px solid #f0f2f5;">
+          <td style="padding: 10px 0; color: #65676b; font-size: 14px; width: 130px;">📍 <b>Location:</b></td>
+          <td style="padding: 10px 0; color: #1c1e21; font-size: 14px; font-weight: 600;">{work_location} ({work_style})</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f0f2f5;">
+          <td style="padding: 10px 0; color: #65676b; font-size: 14px;">🎯 <b>Experience:</b></td>
+          <td style="padding: 10px 0; color: #1c1e21; font-size: 14px; font-weight: 600;">{experience_required}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f0f2f5;">
+          <td style="padding: 10px 0; color: #65676b; font-size: 14px;">💡 <b>Key Skills:</b></td>
+          <td style="padding: 10px 0; color: #1c1e21; font-size: 14px;">{skills_text}</td>
+        </tr>
+      </table>
+
+      <!-- Action Buttons -->
+      <div style="text-align: center; margin-top: 25px; margin-bottom: 10px;">
+        <a href="{clean_app_link}" target="_blank" style="display: inline-block; background-color: #0a66c2; color: #ffffff; text-decoration: none; font-weight: 700; padding: 14px 28px; border-radius: 8px; font-size: 15px; margin: 6px; box-shadow: 0 4px 10px rgba(10,102,194,0.3);">🚀 Apply on Company Website</a>
+        <a href="{job_link}" target="_blank" style="display: inline-block; background-color: #f0f2f5; color: #0a66c2; text-decoration: none; font-weight: 600; padding: 14px 22px; border-radius: 8px; font-size: 14px; margin: 6px; border: 1px solid #d0d7de;">View on LinkedIn</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f8fafc; padding: 14px 28px; font-size: 12px; color: #8c9ba5; text-align: center; border-top: 1px solid #eef2f6;">
+      Filtered & matched by your LinkedIn AI Bot · {now_str}
+    </div>
+  </div>
+</body>
+</html>
+"""
+        plain_text = (
+            f"New External Job Lead:\n\n"
+            f"Title: {title}\n"
+            f"Company: {company}\n"
+            f"Location: {work_location} ({work_style})\n"
+            f"Experience: {experience_required}\n"
+            f"Skills: {skills_text}\n\n"
+            f"Direct Apply Link:\n{clean_app_link}\n\n"
+            f"LinkedIn Job Link:\n{job_link}\n"
+        )
+        send_email(subject, html_content, plain_text)
+
+    # 2. Dispatch WhatsApp (if enabled)
+    if globals().get("enable_whatsapp_job_notifications", False):
+        w_phone = globals().get("whatsapp_phone", "")
+        w_key = globals().get("whatsapp_callmebot_apikey", "")
+        if w_phone and w_key:
+            wa_message = (
+                f"💼 *New External Job Lead!*\n\n"
+                f"📌 *Role:* {title}\n"
+                f"🏢 *Company:* {company}\n"
+                f"📍 *Location:* {work_location} ({work_style})\n"
+                f"🎯 *Experience:* {experience_required}\n\n"
+                f"🌐 *Direct Apply:*\n{clean_app_link}\n\n"
+                f"🔗 *LinkedIn:*\n{job_link}"
+            )
+            send_whatsapp(w_phone, w_key, wa_message)
+
+    # 3. Direct 1-tap push notification to phone via ntfy
+    topic = globals().get("ntfy_topic", "")
+    if topic:
+        url = f"https://ntfy.sh/{topic}"
+        headers = {
+            "Title": _encode_rfc2047(f"💼 External Job: {title}"),
+            "Priority": "high",
+            "Tags": "briefcase,globe_with_meridians",
+            "Click": clean_app_link
+        }
+        ntfy_msg = f"{company} · {work_location}\nTap to open external application link directly!"
+        try:
+            requests.post(url, data=ntfy_msg.encode("utf-8"), headers=headers, timeout=10)
+        except Exception:
+            pass
 
 
 def notify(title: str, message: str, priority: str = "default", tags: str = "robot", color: int = 3447003):

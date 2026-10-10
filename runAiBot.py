@@ -49,7 +49,7 @@ from modules.open_chrome import *
 from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
-from modules.notifier import notify_run_start, notify_run_complete, notify_error
+from modules.notifier import notify_run_start, notify_run_complete, notify_error, notify_external_job
 
 if use_AI:
     from modules.ai.openaiConnections import ai_create_openai_client, ai_extract_skills, ai_answer_question, ai_close_openai_client
@@ -800,21 +800,23 @@ def external_apply(pagination_element: WebElement, job_id: str, job_link: str, r
     try:
         wait.until(EC.element_to_be_clickable((By.XPATH, ".//button[contains(@class,'jobs-apply-button') and contains(@class, 'artdeco-button--3')]"))).click() # './/button[contains(span, "Apply") and not(span[contains(@class, "disabled")])]'
         wait_span_click(driver, "Continue", 1, True, False)
+        buffer(1)
         windows = driver.window_handles
         tabs_count = len(windows)
-        driver.switch_to.window(windows[-1])
-        application_link = driver.current_url
-        print_lg('Got the external application link "{}"'.format(application_link))
-        if close_tabs and driver.current_window_handle != linkedIn_tab: driver.close()
-        driver.switch_to.window(linkedIn_tab)
+        if len(windows) > 1:
+            driver.switch_to.window(windows[-1])
+            buffer(1)
+            application_link = driver.current_url
+            print_lg('Got the external application link "{}"'.format(application_link))
+            if close_tabs and driver.current_window_handle != linkedIn_tab: driver.close()
+            driver.switch_to.window(linkedIn_tab)
+        else:
+            application_link = job_link
         return False, application_link, tabs_count
     except Exception as e:
-        # print_lg(e)
-        print_lg("Failed to apply!")
-        failed_job(job_id, job_link, resume, date_listed, "Probably didn't find Apply button or unable to switch tabs.", e, application_link, screenshot_name)
-        global failed_count
-        failed_count += 1
-        return True, application_link, tabs_count
+        print_lg(f"Could not open external apply tab ({e}), using LinkedIn job link directly.")
+        application_link = job_link
+        return False, application_link, tabs_count
 
 
 
@@ -1133,8 +1135,23 @@ def apply_to_jobs(search_terms: list[str]) -> None:
 
                     print_lg(f'Successfully saved "{title} | {company}" job. Job ID: {job_id} info')
                     current_count += 1
-                    if application_link == "Easy Applied": easy_applied_count += 1
-                    else:   external_jobs_count += 1
+                    if application_link == "Easy Applied": 
+                        easy_applied_count += 1
+                    else:   
+                        external_jobs_count += 1
+                        try:
+                            notify_external_job(
+                                title=title,
+                                company=company,
+                                work_location=work_location,
+                                work_style=work_style,
+                                job_link=job_link,
+                                application_link=application_link,
+                                experience_required=str(experience_required) if experience_required else "Not specified",
+                                skills=skills if skills else "Not specified"
+                            )
+                        except Exception as ne:
+                            print_lg("Failed to send external job notification:", ne)
                     applied_jobs.add(job_id)
 
 

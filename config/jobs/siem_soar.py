@@ -41,7 +41,7 @@ randomize_search_order = True
 sort_by = ""
 date_posted = "Past week" # [Past 24 hours,Past 3 days,Past week,Past 2 weeks,Past month,Past 6 months]
 salary = ""
-easy_apply_only = True
+easy_apply_only = False
 
 experience_level = ["Entry level", "Associate", "Mid-Senior level"]
 job_type = ["Full-time", "Contract"]

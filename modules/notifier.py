@@ -187,6 +187,115 @@ def send_whatsapp(phone: str, apikey: str, message: str) -> bool:
         return False
 
 
+def notify_external_jobs_digest(jobs: list[dict]) -> bool:
+    '''
+    Send a single digest email containing all external (non-Easy Apply) job opportunities
+    collected during the run.
+    '''
+    if not jobs:
+        return False
+
+    now_str = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
+    total_jobs = len(jobs)
+
+    # 1. Dispatch Digest Email (if enabled)
+    if globals().get("enable_email_job_notifications", True):
+        subject = f"💼 [Job Leads Digest] {total_jobs} External Job Opportunities ({now_str})"
+
+        cards_html = ""
+        plain_cards_text = ""
+        for i, job in enumerate(jobs, start=1):
+            title = job.get("title", "Untitled Role")
+            company = job.get("company", "Unknown Company")
+            work_location = job.get("work_location", "Not specified")
+            work_style = job.get("work_style", "")
+            location_str = f"{work_location} ({work_style})" if work_style else work_location
+            experience = job.get("experience_required", "Not specified")
+            skills = job.get("skills", "")
+            skills_text = ", ".join(skills) if isinstance(skills, (list, set)) else str(skills or "Not specified")
+            job_link = job.get("job_link", "")
+            app_link = job.get("application_link", "")
+            clean_app_link = app_link if app_link and app_link != "Easy Applied" else job_link
+
+            cards_html += f"""
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+        <span style="background: #e0f2fe; color: #0369a1; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;">#{i}</span>
+        <h3 style="margin: 6px 0 2px 0; font-size: 17px; font-weight: 700; color: #0f172a; line-height: 1.3;">{title}</h3>
+        <div style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 10px;">🏢 {company}</div>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">📍 <b>Location:</b> {location_str}</div>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">🎯 <b>Experience:</b> {experience}</div>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 14px;">💡 <b>Skills:</b> {skills_text}</div>
+        <div>
+          <a href="{clean_app_link}" target="_blank" style="display: inline-block; background-color: #0a66c2; color: #ffffff; text-decoration: none; font-weight: 700; padding: 9px 18px; border-radius: 6px; font-size: 13px; margin-right: 6px; box-shadow: 0 2px 6px rgba(10,102,194,0.25);">🚀 Apply on Company Website</a>
+          <a href="{job_link}" target="_blank" style="display: inline-block; background-color: #f1f5f9; color: #0a66c2; text-decoration: none; font-weight: 600; padding: 9px 14px; border-radius: 6px; font-size: 13px; border: 1px solid #cbd5e1;">View on LinkedIn</a>
+        </div>
+      </div>"""
+
+            plain_cards_text += (
+                f"\n--- Job #{i}: {title} ---\n"
+                f"Company: {company}\n"
+                f"Location: {location_str}\n"
+                f"Experience: {experience}\n"
+                f"Skills: {skills_text}\n"
+                f"Direct Apply Link: {clean_app_link}\n"
+                f"LinkedIn Link: {job_link}\n"
+            )
+
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 24px 12px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+    
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #0a66c2 0%, #004182 100%); padding: 28px 32px; color: #ffffff;">
+      <span style="background: rgba(255,255,255,0.22); color: #ffffff; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px;">Run Digest</span>
+      <h1 style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">{total_jobs} External Job Opportunities</h1>
+      <p style="margin: 0; font-size: 14px; opacity: 0.95;">Found during your latest automated LinkedIn search session.</p>
+    </div>
+
+    <!-- Job Cards List -->
+    <div style="padding: 24px;">
+      {cards_html}
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f8fafc; padding: 16px 28px; font-size: 12px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0;">
+      Filtered & matched by your LinkedIn AI Bot · {now_str}
+    </div>
+
+  </div>
+</body>
+</html>
+"""
+        plain_text = (
+            f"LinkedIn AI Bot - External Jobs Run Digest\n"
+            f"Run completed at: {now_str}\n"
+            f"Total external opportunities found: {total_jobs}\n"
+            f"{'='*50}\n"
+            f"{plain_cards_text}\n\n"
+            f"Happy applying!"
+        )
+        send_email(subject, html_content, plain_text)
+
+    # 2. Dispatch WhatsApp digest summary (if enabled)
+    if globals().get("enable_whatsapp_job_notifications", False):
+        w_phone = globals().get("whatsapp_phone", "")
+        w_key = globals().get("whatsapp_callmebot_apikey", "")
+        if w_phone and w_key:
+            wa_lines = [f"💼 *LinkedIn Bot Digest: {total_jobs} External Jobs Found*\n"]
+            for i, job in enumerate(jobs, start=1):
+                clean_link = job.get("application_link") or job.get("job_link")
+                wa_lines.append(f"{i}. *{job.get('title')}* at {job.get('company')}\n🔗 {clean_link}")
+            send_whatsapp(w_phone, w_key, "\n\n".join(wa_lines))
+
+    return True
+
+
 def notify_external_job(
     title: str,
     company: str,
@@ -198,107 +307,18 @@ def notify_external_job(
     skills: str = ""
 ) -> None:
     '''
-    Send rich notification (Email + WhatsApp + ntfy/phone) when a relevant non-Easy Apply job is found.
+    Adapter function: delegates to notify_external_jobs_digest as a single-item list.
     '''
-    now_str = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
-    clean_app_link = application_link if application_link and application_link != "Easy Applied" else job_link
-    skills_text = ", ".join(skills) if isinstance(skills, (list, set)) else str(skills or "Not specified")
-
-    # 1. Dispatch Email (if enabled)
-    if globals().get("enable_email_job_notifications", True):
-        subject = f"💼 [Job Lead] {title} at {company} ({work_location})"
-        html_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 20px; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); border: 1px solid #e1e4e8;">
-    
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #0a66c2 0%, #004182 100%); padding: 24px 28px; color: #ffffff;">
-      <span style="background: rgba(255,255,255,0.22); color: #ffffff; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px;">External Apply Opportunity</span>
-      <h1 style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">{title}</h1>
-      <p style="margin: 0; font-size: 16px; opacity: 0.95; font-weight: 500;">🏢 {company}</p>
-    </div>
-
-    <!-- Body Info -->
-    <div style="padding: 24px 28px;">
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-        <tr style="border-bottom: 1px solid #f0f2f5;">
-          <td style="padding: 10px 0; color: #65676b; font-size: 14px; width: 130px;">📍 <b>Location:</b></td>
-          <td style="padding: 10px 0; color: #1c1e21; font-size: 14px; font-weight: 600;">{work_location} ({work_style})</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f0f2f5;">
-          <td style="padding: 10px 0; color: #65676b; font-size: 14px;">🎯 <b>Experience:</b></td>
-          <td style="padding: 10px 0; color: #1c1e21; font-size: 14px; font-weight: 600;">{experience_required}</td>
-        </tr>
-        <tr style="border-bottom: 1px solid #f0f2f5;">
-          <td style="padding: 10px 0; color: #65676b; font-size: 14px;">💡 <b>Key Skills:</b></td>
-          <td style="padding: 10px 0; color: #1c1e21; font-size: 14px;">{skills_text}</td>
-        </tr>
-      </table>
-
-      <!-- Action Buttons -->
-      <div style="text-align: center; margin-top: 25px; margin-bottom: 10px;">
-        <a href="{clean_app_link}" target="_blank" style="display: inline-block; background-color: #0a66c2; color: #ffffff; text-decoration: none; font-weight: 700; padding: 14px 28px; border-radius: 8px; font-size: 15px; margin: 6px; box-shadow: 0 4px 10px rgba(10,102,194,0.3);">🚀 Apply on Company Website</a>
-        <a href="{job_link}" target="_blank" style="display: inline-block; background-color: #f0f2f5; color: #0a66c2; text-decoration: none; font-weight: 600; padding: 14px 22px; border-radius: 8px; font-size: 14px; margin: 6px; border: 1px solid #d0d7de;">View on LinkedIn</a>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="background: #f8fafc; padding: 14px 28px; font-size: 12px; color: #8c9ba5; text-align: center; border-top: 1px solid #eef2f6;">
-      Filtered & matched by your LinkedIn AI Bot · {now_str}
-    </div>
-  </div>
-</body>
-</html>
-"""
-        plain_text = (
-            f"New External Job Lead:\n\n"
-            f"Title: {title}\n"
-            f"Company: {company}\n"
-            f"Location: {work_location} ({work_style})\n"
-            f"Experience: {experience_required}\n"
-            f"Skills: {skills_text}\n\n"
-            f"Direct Apply Link:\n{clean_app_link}\n\n"
-            f"LinkedIn Job Link:\n{job_link}\n"
-        )
-        send_email(subject, html_content, plain_text)
-
-    # 2. Dispatch WhatsApp (if enabled)
-    if globals().get("enable_whatsapp_job_notifications", False):
-        w_phone = globals().get("whatsapp_phone", "")
-        w_key = globals().get("whatsapp_callmebot_apikey", "")
-        if w_phone and w_key:
-            wa_message = (
-                f"💼 *New External Job Lead!*\n\n"
-                f"📌 *Role:* {title}\n"
-                f"🏢 *Company:* {company}\n"
-                f"📍 *Location:* {work_location} ({work_style})\n"
-                f"🎯 *Experience:* {experience_required}\n\n"
-                f"🌐 *Direct Apply:*\n{clean_app_link}\n\n"
-                f"🔗 *LinkedIn:*\n{job_link}"
-            )
-            send_whatsapp(w_phone, w_key, wa_message)
-
-    # 3. Direct 1-tap push notification to phone via ntfy
-    topic = globals().get("ntfy_topic", "")
-    if topic:
-        url = f"https://ntfy.sh/{topic}"
-        headers = {
-            "Title": _encode_rfc2047(f"💼 External Job: {title}"),
-            "Priority": "high",
-            "Tags": "briefcase,globe_with_meridians",
-            "Click": clean_app_link
-        }
-        ntfy_msg = f"{company} · {work_location}\nTap to open external application link directly!"
-        try:
-            requests.post(url, data=ntfy_msg.encode("utf-8"), headers=headers, timeout=10)
-        except Exception:
-            pass
+    notify_external_jobs_digest([{
+        "title": title,
+        "company": company,
+        "work_location": work_location,
+        "work_style": work_style,
+        "job_link": job_link,
+        "application_link": application_link,
+        "experience_required": experience_required,
+        "skills": skills
+    }])
 
 
 def notify(title: str, message: str, priority: str = "default", tags: str = "robot", color: int = 3447003):
@@ -351,6 +371,7 @@ def notify_run_complete(easy_applied: int = 0, external: int = 0, failed: int = 
     total_processed = easy_applied + external
 
     title = "✅ LinkedIn Bot Run Completed"
+    digest_note = f"\n• ✉️ Digest email sent with {external} external job links!" if external > 0 else ""
     message = (
         f"Job application run has finished!\n\n"
         f"📊 Summary:\n"
@@ -361,6 +382,7 @@ def notify_run_complete(easy_applied: int = 0, external: int = 0, failed: int = 
         f"• Failed Jobs: {failed}\n"
         f"• Approx Time Saved: ~{time_saved_mins} mins\n"
         f"• Completed At: {now}"
+        f"{digest_note}"
     )
     print(f"\n[Notifier] Sending run complete notification to phone...")
     notify(title, message, priority="default", tags="white_check_mark,partying_face", color=3066993)

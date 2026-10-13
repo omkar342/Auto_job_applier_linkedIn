@@ -49,7 +49,7 @@ from modules.open_chrome import *
 from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv, count_today_easy_applied_jobs, is_within_operating_hours
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
-from modules.notifier import notify_run_start, notify_run_complete, notify_error, notify_external_job
+from modules.notifier import notify_run_start, notify_run_complete, notify_error, notify_external_jobs_digest
 
 if use_AI:
     from modules.ai.openaiConnections import ai_create_openai_client, ai_extract_skills, ai_answer_question, ai_close_openai_client
@@ -92,6 +92,7 @@ external_jobs_count = 0
 failed_count = 0
 skip_count = 0
 dailyEasyApplyLimitReached = False
+collected_external_jobs = []
 
 re_experience = re.compile(r'[(]?\s*(\d+)\s*[)]?\s*[-to]*\s*\d*[+]*\s*year[s]?', re.IGNORECASE)
 
@@ -904,7 +905,7 @@ def apply_to_jobs(search_terms: list[str]) -> None:
     applied_jobs = get_applied_job_ids()
     rejected_jobs = set()
     blacklisted_companies = set()
-    global current_city, failed_count, skip_count, easy_applied_count, external_jobs_count, tabs_count, pause_before_submit, pause_at_failed_question, useNewResume
+    global current_city, failed_count, skip_count, easy_applied_count, external_jobs_count, tabs_count, pause_before_submit, pause_at_failed_question, useNewResume, collected_external_jobs
     current_city = current_city.strip()
 
     starting_today_easy_applied = count_today_easy_applied_jobs(file_name)
@@ -1165,19 +1166,16 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                             return
                     else:   
                         external_jobs_count += 1
-                        try:
-                            notify_external_job(
-                                title=title,
-                                company=company,
-                                work_location=work_location,
-                                work_style=work_style,
-                                job_link=job_link,
-                                application_link=application_link,
-                                experience_required=str(experience_required) if experience_required else "Not specified",
-                                skills=skills if skills else "Not specified"
-                            )
-                        except Exception as ne:
-                            print_lg("Failed to send external job notification:", ne)
+                        collected_external_jobs.append({
+                            "title": title,
+                            "company": company,
+                            "work_location": work_location,
+                            "work_style": work_style,
+                            "job_link": job_link,
+                            "application_link": application_link,
+                            "experience_required": str(experience_required) if experience_required else "Not specified",
+                            "skills": skills if skills else "Not specified"
+                        })
                     applied_jobs.add(job_id)
 
 
@@ -1359,6 +1357,14 @@ def main() -> None:
         if timeSaved > 0:
             timeSaved += 60
             timeSavedMsg = f"In this run, you saved approx {round(timeSaved/60)} mins ({timeSaved} secs), please consider supporting the project."
+        # Dispatch batch digest email for all collected external jobs in this run
+        if collected_external_jobs:
+            try:
+                print_lg(f"Sending batch digest email for {len(collected_external_jobs)} external job leads...")
+                notify_external_jobs_digest(collected_external_jobs)
+            except Exception as de:
+                print_lg("Failed to send external jobs digest email:", de)
+
         notify_run_complete(
             easy_applied=easy_applied_count,
             external=external_jobs_count,

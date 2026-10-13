@@ -47,8 +47,15 @@ stop_date_cycle_at_24hr = True      # True or False, Note: True or False are cas
 # Skip jobs that were posted more than 24 hours ago? (Set to False to apply to older jobs like past week/month)
 strict_24hr_check = False           # True or False, Note: True or False are case-sensitive
 
-# Stop the program after reaching a certain number of successful applications (Easy Applied + External)
+# Stop the program after reaching a certain number of successful applications in a single run (Easy Applied + External)
 total_applications_limit = 10 # 0 for no limit, or any positive integer Eg: 10, 50, 100...
+
+# Daily Auto-Apply (Easy Apply) limit across all runs in a single calendar day
+daily_auto_apply_limit = 50   # Max Easy Apply jobs per day (0 for no limit). If reached, cron and bot will skip running.
+
+# Operational hours (24-hour format): Bot will not run before start hour or after max hour
+run_start_hour = 9            # 9:00 AM (inclusive)
+max_run_hour = 18             # 6:00 PM (18:00 - will not start or continue running after 6:00 PM)
 
 
 # >>>>>>>>>>> Scheduling Settings <<<<<<<<<<<

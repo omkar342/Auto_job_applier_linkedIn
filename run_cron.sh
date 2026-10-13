@@ -55,8 +55,28 @@ fi
 echo $$ > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"' EXIT
 
+# Check operating hours (between 09:00 and 18:00 max)
+CURRENT_HOUR=$(date +%-H)
+CURRENT_MIN=$(date +%-M)
+if [ "$CURRENT_HOUR" -gt 18 ] || ([ "$CURRENT_HOUR" -eq 18 ] && [ "$CURRENT_MIN" -gt 0 ]); then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Current time is past 6:00 PM ($CURRENT_HOUR:$CURRENT_MIN). Skipping cron execution." >> "$LOG_FILE"
+    exit 0
+fi
+
+if [ "$CURRENT_HOUR" -lt 9 ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Current time is before 9:00 AM ($CURRENT_HOUR:$CURRENT_MIN). Skipping cron execution." >> "$LOG_FILE"
+    exit 0
+fi
+
+# Check daily auto-applied limit (max 50 jobs per day)
+TODAY_COUNT=$("$PYTHON_BIN" -c "from modules.helpers import count_today_easy_applied_jobs; print(count_today_easy_applied_jobs())" 2>/dev/null || echo 0)
+if [ "$TODAY_COUNT" -ge 50 ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Daily auto-apply limit of 50 jobs reached today ($TODAY_COUNT applied). Skipping cron execution." >> "$LOG_FILE"
+    exit 0
+fi
+
 echo "==============================================================================" >> "$LOG_FILE"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cron job triggered: Starting LinkedIn AI Bot..." >> "$LOG_FILE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cron job triggered (Applied today: $TODAY_COUNT/50): Starting LinkedIn AI Bot..." >> "$LOG_FILE"
 
 # Execute bot once
 "$PYTHON_BIN" cron_scheduler.py --once >> "$LOG_FILE" 2>&1

@@ -46,7 +46,7 @@ from config.secrets import use_AI, username, password, ai_provider
 from config.settings import *
 
 from modules.open_chrome import *
-from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv
+from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv, count_today_easy_applied_jobs, is_within_operating_hours
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
 from modules.notifier import notify_run_start, notify_run_complete, notify_error, notify_external_job
@@ -907,10 +907,24 @@ def apply_to_jobs(search_terms: list[str]) -> None:
     global current_city, failed_count, skip_count, easy_applied_count, external_jobs_count, tabs_count, pause_before_submit, pause_at_failed_question, useNewResume
     current_city = current_city.strip()
 
+    starting_today_easy_applied = count_today_easy_applied_jobs(file_name)
+    if daily_auto_apply_limit > 0 and (starting_today_easy_applied + easy_applied_count) >= daily_auto_apply_limit:
+        print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs already reached today ({starting_today_easy_applied + easy_applied_count} applied)! Stopping.  ###############\n")
+        return
+
     if randomize_search_order:
         shuffle(search_terms)
         print_lg(f"Randomized search terms order: {search_terms}")
     for searchTerm in search_terms:
+        # Check operating hours and daily limit before each search term
+        within_hours, hour_reason = is_within_operating_hours(run_start_hour, max_run_hour)
+        if not within_hours:
+            print_lg(f"\n###############  Operating hours exceeded ({hour_reason})! Stopping.  ###############\n")
+            return
+        if daily_auto_apply_limit > 0 and (starting_today_easy_applied + easy_applied_count) >= daily_auto_apply_limit:
+            print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs reached today ({starting_today_easy_applied + easy_applied_count} applied)! Stopping.  ###############\n")
+            return
+
         driver.get(f"https://www.linkedin.com/jobs/search/?keywords={searchTerm}")
         print_lg("\n________________________________________________________________________________________________________________________\n")
         print_lg(f'\n>>>> Now searching for "{searchTerm}" <<<<\n\n')
@@ -936,6 +950,15 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                     
                     if total_applications_limit > 0 and (easy_applied_count + external_jobs_count) >= total_applications_limit:
                         print_lg(f"\n###############  Global application limit reached ({total_applications_limit})!  ###############\n")
+                        return
+
+                    if daily_auto_apply_limit > 0 and (starting_today_easy_applied + easy_applied_count) >= daily_auto_apply_limit:
+                        print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs reached today ({starting_today_easy_applied + easy_applied_count} applied)! Stopping.  ###############\n")
+                        return
+
+                    within_hours, hour_reason = is_within_operating_hours(run_start_hour, max_run_hour)
+                    if not within_hours:
+                        print_lg(f"\n###############  Operating hours exceeded ({hour_reason})! Stopping.  ###############\n")
                         return
 
                     print_lg("\n-@-\n")
@@ -1137,6 +1160,9 @@ def apply_to_jobs(search_terms: list[str]) -> None:
                     current_count += 1
                     if application_link == "Easy Applied": 
                         easy_applied_count += 1
+                        if daily_auto_apply_limit > 0 and (starting_today_easy_applied + easy_applied_count) >= daily_auto_apply_limit:
+                            print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs reached today ({starting_today_easy_applied + easy_applied_count} applied)! Stopping.  ###############\n")
+                            return
                     else:   
                         external_jobs_count += 1
                         try:
@@ -1190,13 +1216,21 @@ def apply_to_jobs(search_terms: list[str]) -> None:
 def run(total_runs: int) -> int:
     if dailyEasyApplyLimitReached:
         return total_runs
+    today_applied = count_today_easy_applied_jobs(file_name)
+    if daily_auto_apply_limit > 0 and (today_applied + easy_applied_count) >= daily_auto_apply_limit:
+        print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs reached today ({today_applied + easy_applied_count} applied). Skipping cycle.  ###############\n")
+        return total_runs
+    within_hours, hour_reason = is_within_operating_hours(run_start_hour, max_run_hour)
+    if not within_hours:
+        print_lg(f"\n###############  Outside operating hours ({hour_reason}). Skipping cycle.  ###############\n")
+        return total_runs
     print_lg("\n########################################################################################################################\n")
     print_lg(f"Date and Time: {datetime.now()}")
     print_lg(f"Cycle number: {total_runs}")
     print_lg(f"Currently looking for jobs posted within '{date_posted}' and sorting them by '{sort_by}'")
     apply_to_jobs(search_terms)
     print_lg("########################################################################################################################\n")
-    if not dailyEasyApplyLimitReached and not (total_applications_limit > 0 and (easy_applied_count + external_jobs_count) >= total_applications_limit):
+    if not dailyEasyApplyLimitReached and not (total_applications_limit > 0 and (easy_applied_count + external_jobs_count) >= total_applications_limit) and not (daily_auto_apply_limit > 0 and (today_applied + easy_applied_count) >= daily_auto_apply_limit):
         print_lg("Sleeping for 10 min...")
         sleep(300)
         print_lg("Few more min... Gonna start with in next 5 min...")
@@ -1210,6 +1244,16 @@ chatGPT_tab = False
 linkedIn_tab = False
 
 def main() -> None:
+    today_applied = count_today_easy_applied_jobs(file_name)
+    if daily_auto_apply_limit > 0 and today_applied >= daily_auto_apply_limit:
+        print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs already reached today ({today_applied} applied). Exiting.  ###############\n")
+        return
+
+    within_hours, hour_reason = is_within_operating_hours(run_start_hour, max_run_hour)
+    if not within_hours:
+        print_lg(f"\n###############  Outside operating hours ({hour_reason}). Exiting.  ###############\n")
+        return
+
     notify_run_start()
     alert("Please consider sponsoring this project at:\n\nhttps://github.com/sponsors/GodsScion\n\n", "Support the project", "Okay")
     total_runs = 1

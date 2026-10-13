@@ -293,3 +293,38 @@ def truncate_for_csv(data, max_length: int = 131000, suffix: str = "...[TRUNCATE
         return truncated
     except Exception as e:
         return f"[ERROR CONVERTING DATA: {e}]"
+
+
+def count_today_easy_applied_jobs(csv_path: str = "all excels/all_applied_applications_history.csv") -> int:
+    '''
+    Count how many Easy Applied (auto applied) applications have been submitted today.
+    '''
+    import csv
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    count = 0
+    if not os.path.exists(csv_path):
+        return 0
+    try:
+        with open(csv_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('External Job link') == 'Easy Applied':
+                    date_app = str(row.get('Date Applied', ''))
+                    if date_app.startswith(today_str):
+                        count += 1
+    except Exception as e:
+        print(f"Error checking today's applied count: {e}")
+    return count
+
+
+def is_within_operating_hours(start_hour: int = 9, end_hour: int = 18) -> tuple[bool, str]:
+    '''
+    Check if current local time is within allowed operating hours (e.g. 9:00 AM to 6:00 PM).
+    Returns (True, "") if within hours, or (False, reason) if outside.
+    '''
+    now = datetime.now()
+    if now.hour < start_hour:
+        return False, f"Current time ({now.strftime('%I:%M %p')}) is before {start_hour}:00 AM"
+    if now.hour > end_hour or (now.hour == end_hour and (now.minute > 0 or now.second > 0)):
+        return False, f"Current time ({now.strftime('%I:%M %p')}) is after {end_hour % 12 or 12}:00 PM"
+    return True, ""

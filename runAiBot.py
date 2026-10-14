@@ -1264,7 +1264,7 @@ def main() -> None:
     alert("Please consider sponsoring this project at:\n\nhttps://github.com/sponsors/GodsScion\n\n", "Support the project", "Okay")
     total_runs = 1
     try:
-        global linkedIn_tab, tabs_count, useNewResume, aiClient
+        global linkedIn_tab, tabs_count, useNewResume, aiClient, default_resume_path
         alert_title = "Error Occurred. Closing Browser!"
         validate_config()
         

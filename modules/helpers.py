@@ -328,3 +328,28 @@ def is_within_operating_hours(start_hour: int = 9, end_hour: int = 18) -> tuple[
     if now.hour > end_hour or (now.hour == end_hour and (now.minute > 0 or now.second > 0)):
         return False, f"Current time ({now.strftime('%I:%M %p')}) is after {end_hour % 12 or 12}:00 PM"
     return True, ""
+
+
+def resolve_resume_path(configured_path: str = "all resumes/default") -> str:
+    '''
+    Resolves the actual resume file path to use.
+    1. If configured_path points to an existing file, returns it.
+    2. If not, checks the parent folder or 'all resumes/default' for any .pdf files
+       and automatically selects the newest one by modification time.
+    3. Falls back to configured_path if no PDF is found.
+    '''
+    if configured_path and os.path.isfile(configured_path):
+        return configured_path
+
+    # Check the directory of configured_path or 'all resumes/default'
+    folder = configured_path if (configured_path and os.path.isdir(configured_path)) else (os.path.dirname(configured_path) if configured_path else "")
+    if not folder or not os.path.isdir(folder):
+        folder = "all resumes/default"
+
+    if os.path.isdir(folder):
+        pdfs = [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(".pdf") and not f.startswith(".")]
+        if pdfs:
+            pdfs.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+            return pdfs[0]
+
+    return configured_path

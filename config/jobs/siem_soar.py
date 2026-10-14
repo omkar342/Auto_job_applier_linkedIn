@@ -72,7 +72,7 @@ current_experience = -1
 # APPLICATION & EASY APPLY DETAILS
 # ==============================================================================
 
-default_resume_path = "all resumes/default/resume.pdf"
+default_resume_path = "all resumes/default/Omkar_Jadhav_SecOps_Resume_(13-10-2026).pdf"
 years_of_experience = "3"
 recent_employer = "Metron Security"
 

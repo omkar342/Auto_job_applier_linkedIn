@@ -46,7 +46,7 @@ from config.secrets import use_AI, username, password, ai_provider
 from config.settings import *
 
 from modules.open_chrome import *
-from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv, count_today_easy_applied_jobs, is_within_operating_hours
+from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv, count_today_easy_applied_jobs, is_within_operating_hours, resolve_resume_path
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
 from modules.notifier import notify_run_start, notify_run_complete, notify_error, notify_external_jobs_digest
@@ -1260,9 +1260,13 @@ def main() -> None:
         alert_title = "Error Occurred. Closing Browser!"
         validate_config()
         
+        default_resume_path = resolve_resume_path(default_resume_path)
         if not os.path.exists(default_resume_path):
             alert(text='Your default resume "{}" is missing! Please update it\'s folder path "default_resume_path" in config.py\n\nOR\n\nAdd a resume with exact name and path (check for spelling mistakes including cases).\n\n\nFor now the bot will continue using your previous upload from LinkedIn!'.format(default_resume_path), title="Missing Resume", button="OK")
             useNewResume = False
+        else:
+            print_lg(f"Active resume selected: {default_resume_path}")
+            useNewResume = True
         
         # Login to LinkedIn
         tabs_count = len(driver.window_handles)

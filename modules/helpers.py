@@ -317,11 +317,23 @@ def count_today_easy_applied_jobs(csv_path: str = "all excels/all_applied_applic
     return count
 
 
-def is_within_operating_hours(start_hour: int = 9, end_hour: int = 18) -> tuple[bool, str]:
+def is_cron_execution() -> bool:
+    '''
+    Check if the current process is running via automated cron.
+    run_cron.sh sets RUN_CRON=1.
+    '''
+    return os.environ.get("RUN_CRON") == "1"
+
+
+def is_within_operating_hours(start_hour: int = 9, end_hour: int = 18, check_cron_only: bool = True) -> tuple[bool, str]:
     '''
     Check if current local time is within allowed operating hours (e.g. 9:00 AM to 6:00 PM).
-    Returns (True, "") if within hours, or (False, reason) if outside.
+    If check_cron_only is True (default), manual executions (RUN_CRON != "1") are always allowed.
+    Returns (True, "") if within hours or manual, or (False, reason) if outside operating hours during cron.
     '''
+    if check_cron_only and not is_cron_execution():
+        return True, ""  # Manual run is permitted anytime
+
     now = datetime.now()
     if now.hour < start_hour:
         return False, f"Current time ({now.strftime('%I:%M %p')}) is before {start_hour}:00 AM"

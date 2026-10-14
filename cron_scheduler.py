@@ -11,10 +11,11 @@ os.chdir(SCRIPT_DIR)
 from config.settings import scheduler_interval_hours, run_scheduler, daily_auto_apply_limit, run_start_hour, max_run_hour
 from modules.helpers import count_today_easy_applied_jobs, is_within_operating_hours
 
-def check_can_run() -> tuple[bool, str]:
-    within_hours, reason = is_within_operating_hours(run_start_hour, max_run_hour)
-    if not within_hours:
-        return False, f"Outside operating hours: {reason}"
+def check_can_run(enforce_hours: bool = True) -> tuple[bool, str]:
+    if enforce_hours:
+        within_hours, reason = is_within_operating_hours(run_start_hour, max_run_hour, check_cron_only=False)
+        if not within_hours:
+            return False, f"Outside operating hours: {reason}"
     
     if daily_auto_apply_limit > 0:
         today_applied = count_today_easy_applied_jobs()
@@ -37,13 +38,15 @@ def run_bot() -> int:
         return 1
 
 def main():
-    # If invoked with --once or RUN_CRON=1, run single iteration (for Linux cron / CLI trigger)
-    if "--once" in sys.argv or "-1" in sys.argv:
-        can_run, reason = check_can_run()
+    # If invoked with --once or RUN_CRON=1, run single iteration
+    if "--once" in sys.argv or "-1" in sys.argv or os.environ.get("RUN_CRON") == "1":
+        is_cron = os.environ.get("RUN_CRON") == "1"
+        can_run, reason = check_can_run(enforce_hours=is_cron)
         if not can_run:
             print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Skipping run: {reason}.")
             sys.exit(0)
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running single bot execution (--once)...")
+        mode_str = "cron" if is_cron else "manual"
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running bot execution ({mode_str})...")
         code = run_bot()
         sys.exit(code)
 
@@ -55,7 +58,8 @@ def main():
     
     try:
         while True:
-            can_run, reason = check_can_run()
+            # Scheduler daemon enforces hours
+            can_run, reason = check_can_run(enforce_hours=True)
             if can_run:
                 run_bot()
             else:

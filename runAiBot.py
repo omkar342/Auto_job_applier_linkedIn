@@ -46,7 +46,7 @@ from config.secrets import use_AI, username, password, ai_provider
 from config.settings import *
 
 from modules.open_chrome import *
-from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv, count_today_easy_applied_jobs, is_within_operating_hours, resolve_resume_path
+from modules.helpers import alert, confirm, buffer, print_lg, sleep, manual_login_retry, calculate_date_posted, truncate_for_csv, count_today_easy_applied_jobs, is_within_operating_hours, resolve_resume_path, is_cron_execution
 from modules.clickers_and_finders import *
 from modules.validator import validate_config
 from modules.notifier import notify_run_start, notify_run_complete, notify_error, notify_external_jobs_digest
@@ -1242,15 +1242,22 @@ chatGPT_tab = False
 linkedIn_tab = False
 
 def main() -> None:
-    today_applied = count_today_easy_applied_jobs(file_name)
-    if daily_auto_apply_limit > 0 and today_applied >= daily_auto_apply_limit:
-        print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs already reached today ({today_applied} applied). Exiting.  ###############\n")
-        return
+    force_run = "--force" in sys.argv or "-f" in sys.argv
+    is_cron = is_cron_execution()
 
-    within_hours, hour_reason = is_within_operating_hours(run_start_hour, max_run_hour)
-    if not within_hours:
-        print_lg(f"\n###############  Outside operating hours ({hour_reason}). Exiting.  ###############\n")
-        return
+    if not is_cron:
+        print_lg(f"Manual run initiated at {datetime.now().strftime('%I:%M %p')}. Operating hour restrictions (6:00 PM cutoff) are bypassed.")
+    else:
+        within_hours, hour_reason = is_within_operating_hours(run_start_hour, max_run_hour)
+        if not within_hours:
+            print_lg(f"\n###############  Outside operating hours ({hour_reason}). Exiting cron run.  ###############\n")
+            return
+
+    if not force_run:
+        today_applied = count_today_easy_applied_jobs(file_name)
+        if daily_auto_apply_limit > 0 and today_applied >= daily_auto_apply_limit:
+            print_lg(f"\n###############  Daily auto-apply limit of {daily_auto_apply_limit} jobs already reached today ({today_applied} applied). Exiting. (Use --force to override)  ###############\n")
+            return
 
     notify_run_start()
     alert("Please consider sponsoring this project at:\n\nhttps://github.com/sponsors/GodsScion\n\n", "Support the project", "Okay")
